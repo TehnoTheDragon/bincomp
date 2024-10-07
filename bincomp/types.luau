@@ -33,6 +33,65 @@ export type ByteBuffer = {
     slice: (self: ByteBuffer, offset: number, count: number) -> ByteBuffer,
 }
 
+export type TokenKind = "_error"
+                      | "_undefined"
+                      | "_end"
+                      | "word"
+                      | "plus"
+                      | "dash"
+                      | "slash"
+                      | "star"
+                      | "ampersand"
+                      | "money"
+                      | "percent"
+                      | "tail"
+                      | "warning"
+                      | "dot"
+                      | "comma"
+                      | "colon"
+                      | "semicolon"
+                      | "equal"
+                      | "tilda"
+                      | "hashtag"
+                      | "open_paren"
+                      | "close_paren"
+                      | "open_square"
+                      | "close_square"
+                      | "open_arrow"
+                      | "close_arrow"
+                      | "open_curly"
+                      | "close_curly"
+export type Token = {
+    kind: TokenKind,
+    value: any,
+    location: {
+        column: number,
+        row: number,
+        index: number,
+    }
+}
+
+export type Lexer = {
+    current: number,
+    column: number,
+    row: number,
+    length: number,
+    source: string,
+    character: string,
+
+    begin: (Lexer, source: string) -> Lexer, -- all begins here, yes
+    is_end: (Lexer) -> boolean, -- it's true whenever .current is >= than .length
+    stream: (Lexer) -> () -> Token, -- a function that return a token, I think it will be more memory efficient to not store list of tokens but rather use lazy way
+    advance: (Lexer) -> string, -- returns previous character
+    lookup: (Lexer, count: number?) -> string, -- returns next character but not advance the cursor
+    lookup_for: (Lexer, thing: string, jump: number?) -> boolean, -- looks up for the thing, can be useful for stuff like: (== or owo, lol)
+    skip_all_those: (Lexer, those: string) -> (), -- skips all those, you know... those <.<
+}
+
+export type Parser = {
+    token_stream: () -> Token
+}
+
 export type StructField = {
     name: string,
     type: string,
@@ -46,6 +105,10 @@ export type Struct = {
     fields: {[string]: StructField},
     externals: {[string]: Struct},
     size_in_bytes: number,
+}
+
+export type State = {
+    define: (definition: string) -> ()
 }
 
 export type Type = "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f32" | "f64" | "str"
