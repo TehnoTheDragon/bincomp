@@ -167,7 +167,16 @@ local typeSizeMap = table.freeze({
     f64 = 64,
 })
 
-local types = {}
+local types = {
+    builtin_datatypes = table.freeze {
+        "u8", "u16", "u32", "u64",
+        "i8", "i16", "i32", "i64",
+        "f16", "f32", "f64", "f128",
+        "leb128u32", "leb128u64",
+        "leb128i32", "leb128i64",
+        "cstr", "str", "bool"
+    }
+}
 
 export type TypeName = "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f32" | "f64" | "str"
 function types.type_to_size(type: TypeName)
