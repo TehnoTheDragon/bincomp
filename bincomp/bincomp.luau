@@ -1,4 +1,5 @@
 return {
     bytebuffer = require("bytebuffer"),
-    struct = require("struct")
+    struct = require("struct"),
+    new_state = require("state").new,
 }
