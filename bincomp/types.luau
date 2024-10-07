@@ -36,7 +36,10 @@ export type ByteBuffer = {
 export type TokenKind = "_error"
                       | "_undefined"
                       | "_end"
+                      | "number"
+                      | "integer"
                       | "word"
+                      | "string"
                       | "plus"
                       | "dash"
                       | "slash"
@@ -88,30 +91,71 @@ export type Lexer = {
     skip_all_those: (Lexer, those: string) -> (), -- skips all those, you know... those <.<
 }
 
-export type Parser = {
-    token_stream: () -> Token
+export type SymbolKind = "struct" | "enum"
+export type Symbol = {
+    symbol: string,
+    location: number,
+    kind: SymbolKind,
+}
+export type ParserResult = {
+    symbols: {[string]: Symbol},
+    data: {Struct | Enum},
+    tagged: {[string]: {Type}}
 }
 
-export type StructField = {
-    name: string,
-    type: string,
-    external: boolean,
-    array: {number}?,
-    meta: {any},
-    index: number,
+export type Parser = {
+    token: Token, -- current token
+    token_stream: () -> Token, -- token stream
+
+    next: (Parser) -> Token, -- returns what token_stream gives but preprocess it before to handle _undefined and _error token kinds
+    eat: (Parser, expect_kind: TokenKind?) -> Token, -- eats token and returns previous one, if expect kind is not equal the previous token kind will throw and error
+    isa: (Parser, kind: TokenKind) -> boolean,
+    parse: (Parser, state: {}) -> ParserResult,
+    parse_state: (Parser, result: ParserResult, state: {}) -> (),
+    parse_type: (Parser, result: ParserResult, state: {}) -> Type,
+    parse_meta: (Parser, result: ParserResult, state: {}) -> {[any]: any},
+    parse_tags: (Parser, result: ParserResult, state: {}) -> {string},
+    parse_value: (Parser, result: ParserResult, state: {}) -> any,
 }
+
+export type TypeInfo = {
+    typename: string,
+    tags: {string},
+    meta: {[any]: any},
+}
+export type TypeTuple = TypeInfo & {
+    tuple: {Type}
+}
+export type TypeArray = TypeInfo & {
+    holdtype: Type,
+    size: number,
+}
+export type TypeVector = TypeInfo & {
+    holdtype: Type,
+}
+export type Type = TypeInfo | TypeTuple | TypeArray | TypeVector
+
+export type Field = {
+    name: string,
+    type: Type
+}
+export type StructField = Field & {}
 export type Struct = {
     name: string,
     fields: {[string]: StructField},
-    externals: {[string]: Struct},
-    size_in_bytes: number,
+}
+export type EnumField = Field & {
+    index: number,
+}
+export type Enum = {
+    name: string,
+    items: {[string]: EnumField},
 }
 
 export type State = {
     define: (definition: string) -> ()
 }
 
-export type Type = "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f32" | "f64" | "str"
 local typeSizeMap = table.freeze({
     u8 = 8,
     u16 = 16,
@@ -125,7 +169,8 @@ local typeSizeMap = table.freeze({
 
 local types = {}
 
-function types.type_to_size(type: Type)
+export type TypeName = "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f32" | "f64" | "str"
+function types.type_to_size(type: TypeName)
     local bits = typeSizeMap[type]
     if not bits then
         if type == "str" then
