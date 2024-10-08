@@ -91,15 +91,15 @@ export type Lexer = {
     skip_all_those: (Lexer, those: string) -> (), -- skips all those, you know... those <.<
 }
 
-export type SymbolKind = "struct" | "enum"
+export type SymbolKind = "struct" | "enum" | "type"
 export type Symbol = {
     symbol: string,
-    location: number,
+    address: any,
     kind: SymbolKind,
 }
 export type ParserResult = {
     symbols: {[string]: Symbol},
-    data: {Struct | Enum},
+    data: {[any]: Struct | Enum | Type},
     tagged: {[string]: {Type}}
 }
 
@@ -152,8 +152,12 @@ export type Enum = {
     items: {[string]: EnumField},
 }
 
+export type StateDefinition = ParserResult
 export type State = {
-    define: (definition: string) -> ()
+    definition: StateDefinition,
+
+    define: (State, definition: string) -> (),
+    validate: (State) -> (),
 }
 
 local typeSizeMap = table.freeze({
