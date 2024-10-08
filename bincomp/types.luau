@@ -152,7 +152,8 @@ export type Field = {
 export type StructField = Field & {}
 export type Struct = {
     name: string,
-    fields: {[string]: StructField},
+    fields: {[number]: StructField},
+    symbols: {[string]: Struct | Enum | Type},
     size_in_bytes: number,
 }
 export type EnumField = Field & {
@@ -175,18 +176,9 @@ export type State = {
 
     get_symbol: (State, name: string) -> Symbol,
     struct: (State, name: string) -> Struct,
+    enum: (State, name: string) -> Enum,
+    type: (State, name: string) -> Type,
 }
-
-local typeSizeMap = table.freeze({
-    u8 = 8,
-    u16 = 16,
-    u32 = 32,
-    i8 = 8,
-    i16 = 16,
-    i32 = 32,
-    f32 = 32,
-    f64 = 64,
-})
 
 local types = {
     builtin_datatypes = table.freeze {
@@ -199,8 +191,12 @@ local types = {
     }
 }
 
+function types.is_buildin_type(type: string): boolean
+    return table.find(types.builtin_datatypes, type) ~= nil
+end
+
 function types.type_to_size_in_bytes(type: string): number
-    if table.find(types.builtin_datatypes, type) ~= nil then
+    if types.is_buildin_type(type) then
         if type == "cstr" or type == "str" or type == "bool" then
             return 1
         elseif type:find("leb128") ~= nil then

@@ -14,13 +14,27 @@ local types = require("types")
 
 local validator = {}
 
-function validator.validate(result: types.StateDefinition, state)
-    local symbolsToValidate = {}
-    for _, symbol in result.symbols do
-        table.insert(symbolsToValidate, symbol)
+function validator.set_size(result: types.StateDefinition, name: string, size: number, state)
+    if result.sizes[name] == nil then
+        result.sizes[name] = size
     end
-    table.sort(symbolsToValidate, function(a, b) return a.kind ~= "struct" and a.kind ~= "enum" end)
-    for _, symbol in symbolsToValidate do
+end
+
+function validator.get_size(result: types.StateDefinition, name: string, state)
+    local v = result.sizes[name]
+    if not v then
+        state.symbol = result.symbols[name]
+        validator.validate_symbol(result, state)
+        v = result.sizes[name]
+        if not v then
+            error(`Size is not mapped for '{name}'`)
+        end
+    end
+    return v
+end
+
+function validator.validate(result: types.StateDefinition, state)
+    for _, symbol in result.symbols do
         state.symbol = symbol
         validator.validate_symbol(result, state)
     end
@@ -30,8 +44,8 @@ function validator.validate_symbol(result: types.StateDefinition, state)
     local symbol: types.Symbol = state.symbol
     local object = result.data[symbol.address]
     state.object = object
+    validator.set_size(result, symbol.symbol, object.size_in_bytes, state)
     validator[`validate_kind_{symbol.kind}`](result, state)
-    result.sizes[symbol.symbol] = object.size_in_bytes
 end
 
 function validator.validate_kind_enum(result: types.StateDefinition, state)
@@ -43,7 +57,7 @@ function validator.validate_kind_struct(result: types.StateDefinition, state)
     for _, field in struct.fields do
         state.field = field
         validator.validate_field(result, state)
-        struct.size_in_bytes += result.sizes[field.type.typename]
+        struct.size_in_bytes += validator.get_size(result, field.type.typename, state)
     end
 end
 

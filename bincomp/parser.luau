@@ -405,7 +405,7 @@ function parser.parse_type_struct(self: types.Parser, result: types.ParserResult
         error(`Redefined symbol '{identity}'`)
     end
     
-    local struct: types.Struct = { name = identity, fields = {}, size_in_bytes = 0 }
+    local struct: types.Struct = { name = identity, fields = {}, size_in_bytes = 0, symbols = {} }
     local address = tonumber(tostring(struct):sub(8), 16)
     result.data[address] = struct
     result.symbols[identity] = { symbol = identity, address = address, kind = "struct" }
@@ -425,7 +425,10 @@ function parser.parse_type_struct(self: types.Parser, result: types.ParserResult
         state.item = field
         field.type = self:parse_type(result, state)
 
-        struct.fields[identity] = field
+        table.insert(struct.fields, field)
+        if not types.is_buildin_type(field.type.typename) then
+            struct.symbols[field.type.typename] = field.type.typename :: any
+        end
         
         if not self:isa("comma") then break end
         self:eat("comma")
@@ -442,6 +445,7 @@ function parser.parse_type_type(self: types.Parser, result: types.ParserResult, 
     self:eat("equal")
     
     local type: types.Type = self:parse_type(result, state)
+    ;(type :: types.TypeInfo).typename = identity
     local address = tonumber(tostring(type):sub(8), 16)
     result.data[address] = type
     result.symbols[identity] = { symbol = identity, address = address, kind = "type" }

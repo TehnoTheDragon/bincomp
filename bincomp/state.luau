@@ -17,7 +17,8 @@ end
 local types = require("types")
 local parser = require("parser")
 local validator = require("validator")
-local wrap_struct = require("struct")
+local wrap_struct = require("wrap_struct")
+local wrap_type = require("wrap_type")
 
 local state = {}
 
@@ -39,6 +40,12 @@ end
 function state.define(self: types.State, definition_: string)
     local definition = parser.new(definition_):parse({})
     for k,v in definition.data do
+        if (v :: types.Struct).symbols ~= nil then
+            for symbol, _ in (v :: types.Struct).symbols do
+                local address = (self.definition.symbols[symbol] or definition.symbols[symbol]).address
+                ;(v :: types.Struct).symbols[symbol] = self.definition.data[address] or definition.data[address]
+            end
+        end
         self.definition.data[k]=v
     end
     for k,v in definition.tagged do
@@ -61,7 +68,7 @@ function state.define(self: types.State, definition_: string)
         elseif v.kind == "enum" then
 
         elseif v.kind == "type" then
-
+            wrap_type(object)
         end
     end
     (self :: any).dirty = true
@@ -79,9 +86,21 @@ function state.get_symbol(self: types.State, name: string): types.Symbol
     return symbol
 end
 
-function state.struct(self: types.State, name: string): types.State
+function state.struct(self: types.State, name: string): types.Struct
     local symbol = self:get_symbol(name)
     assert(symbol.kind == "struct", `'{name}' is not struct`, 2)
+    return self.definition.data[symbol.address] :: any
+end
+
+function state.enum(self: types.State, name: string): types.Enum
+    local symbol = self:get_symbol(name)
+    assert(symbol.kind == "enum", `'{name}' is not enum`, 2)
+    return self.definition.data[symbol.address] :: any
+end
+
+function state.type(self: types.State, name: string): types.Type
+    local symbol = self:get_symbol(name)
+    assert(symbol.kind == "type", `'{name}' is not type`, 2)
     return self.definition.data[symbol.address] :: any
 end
 
