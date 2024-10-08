@@ -216,11 +216,14 @@ function parser.parse_type(self: types.Parser, result: types.ParserResult, state
                 tags = {},
                 meta = {},
                 tuple = {},
+                size_in_bytes = 0,
             }
     
             self:eat()
             while true do
-                table.insert(typeinfo.tuple, self:parse_type(result, state))
+                local type = self:parse_type(result, state)
+                typeinfo.size_in_bytes += type.size_in_bytes
+                table.insert(typeinfo.tuple, type)
                 if not self:isa("comma") then
                     break
                 end
@@ -230,10 +233,13 @@ function parser.parse_type(self: types.Parser, result: types.ParserResult, state
     
             return typeinfo
         elseif self:isa("word") then
+            local typename = self:eat().value
+            local size_in_bytes = types.type_to_size_in_bytes(typename)
             return {
-                typename = self:eat().value,
+                typename = typename,
                 tags = {},
                 meta = {},
+                size_in_bytes = size_in_bytes,
             } :: types.TypeInfo
         elseif self:isa("open_square") then
             self:eat("open_square")
@@ -242,10 +248,11 @@ function parser.parse_type(self: types.Parser, result: types.ParserResult, state
                 typename = "array",
                 tags = {},
                 meta = {},
+                size_in_bytes = 0,
             }
-    
-            local holdtype = self:parse_type(result, state)
-    
+            
+            local holdtype = get_type()
+            
             if self:isa("comma") then
                 self:eat("comma")
                 local size = self:eat("integer").value
@@ -358,7 +365,7 @@ function parser.parse_type_enum(self: types.Parser, result: types.ParserResult, 
         error(`Redefined symbol '{identity}'`)
     end
     
-    local enum: types.Enum = { name = identity, items = {} }
+    local enum: types.Enum = { name = identity, items = {}, size_in_bytes = 0 }
     local address = tonumber(tostring(enum):sub(8), 16)
     result.data[address] = enum
     result.symbols[identity] = { symbol = identity, address = enum, kind = "enum" }
@@ -398,7 +405,7 @@ function parser.parse_type_struct(self: types.Parser, result: types.ParserResult
         error(`Redefined symbol '{identity}'`)
     end
     
-    local struct: types.Struct = { name = identity, fields = {} }
+    local struct: types.Struct = { name = identity, fields = {}, size_in_bytes = 0 }
     local address = tonumber(tostring(struct):sub(8), 16)
     result.data[address] = struct
     result.symbols[identity] = { symbol = identity, address = address, kind = "struct" }

@@ -31,6 +31,15 @@ export type ByteBuffer = {
     display: (self: ByteBuffer) -> (),
     length: (self: ByteBuffer) -> number,
     slice: (self: ByteBuffer, offset: number, count: number) -> ByteBuffer,
+
+    -- Extra Types
+
+    writeu64: (self: ByteBuffer, offset: number, low: number, high: number) -> ByteBuffer,
+    writei64: (self: ByteBuffer, offset: number, low: number, high: number) -> ByteBuffer,
+    writef16: (self: ByteBuffer, offset: number, value: number) -> ByteBuffer,
+    writef128: (self: ByteBuffer, offset: number, low: number, high: number) -> ByteBuffer,
+    writeleb128u64: (self: ByteBuffer, offset: number, low: number, high: number) -> (number),
+    writeleb128i64: (self: ByteBuffer, offset: number, low: number, high: number) -> (number),
 }
 
 export type TokenKind = "_error"
@@ -122,6 +131,7 @@ export type TypeInfo = {
     typename: string,
     tags: {string},
     meta: {[any]: any},
+    size_in_bytes: number,
 }
 export type TypeTuple = TypeInfo & {
     tuple: {Type}
@@ -143,6 +153,7 @@ export type StructField = Field & {}
 export type Struct = {
     name: string,
     fields: {[string]: StructField},
+    size_in_bytes: number,
 }
 export type EnumField = Field & {
     index: number,
@@ -150,14 +161,20 @@ export type EnumField = Field & {
 export type Enum = {
     name: string,
     items: {[string]: EnumField},
+    size_in_bytes: number,
 }
 
-export type StateDefinition = ParserResult
+export type StateDefinition = ParserResult & {
+    sizes: {[string]: number}
+}
 export type State = {
     definition: StateDefinition,
 
     define: (State, definition: string) -> (),
     validate: (State) -> (),
+
+    get_symbol: (State, name: string) -> Symbol,
+    struct: (State, name: string) -> Struct,
 }
 
 local typeSizeMap = table.freeze({
@@ -182,15 +199,16 @@ local types = {
     }
 }
 
-export type TypeName = "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f32" | "f64" | "str"
-function types.type_to_size(type: TypeName)
-    local bits = typeSizeMap[type]
-    if not bits then
-        if type == "str" then
-            bits = typeSizeMap.u32
+function types.type_to_size_in_bytes(type: string): number
+    if table.find(types.builtin_datatypes, type) ~= nil then
+        if type == "cstr" or type == "str" or type == "bool" then
+            return 1
+        elseif type:find("leb128") ~= nil then
+            return 2
         end
+        return (tonumber(type:sub(2, -1)) or 0) / 8
     end
-    return bits
+    return 0
 end
 
 function types.count_bytes_leb128(value: number): number

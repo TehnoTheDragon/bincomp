@@ -10,9 +10,14 @@ local function print_table<T>(t: {T}, s_: string?)
     end
 end
 
+local function assert_dirty(self)
+    if self.dirty then error(`State is dirty, consider :validate first before using any get (if ignored will lead to the fatal errors)`, 4) end
+end
+
 local types = require("types")
 local parser = require("parser")
 local validator = require("validator")
+local wrap_struct = require("struct")
 
 local state = {}
 
@@ -25,7 +30,9 @@ function state.new(): types.State
             tagged = {},
             symbols = {},
             data = {},
-        }
+            sizes = {},
+        },
+        dirty = false,
     }, state_meta) :: any) :: types.State
 end
 
@@ -46,11 +53,36 @@ function state.define(self: types.State, definition_: string)
             error(`Redefined symbol '{k}'`)
         end
         self.definition.symbols[k]=v
+        local object = self.definition.data[v.address]
+        assert(object, `Undefined symbol '{v.symbol}'`)
+
+        if v.kind == "struct" then
+            wrap_struct(object)
+        elseif v.kind == "enum" then
+
+        elseif v.kind == "type" then
+
+        end
     end
+    (self :: any).dirty = true
 end
 
 function state.validate(self: types.State)
     validator.validate(self.definition, {})
+    ;(self :: any).dirty = false
+end
+
+function state.get_symbol(self: types.State, name: string): types.Symbol
+    assert_dirty(self)
+    local symbol = self.definition.symbols[name]
+    assert(symbol, `Symbol '{name}' is not defined!`)
+    return symbol
+end
+
+function state.struct(self: types.State, name: string): types.State
+    local symbol = self:get_symbol(name)
+    assert(symbol.kind == "struct", `'{name}' is not struct`, 2)
+    return self.definition.data[symbol.address] :: any
 end
 
 return state
