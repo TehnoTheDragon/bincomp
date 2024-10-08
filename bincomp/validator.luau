@@ -11,21 +11,27 @@ end
 
 function validator.validate_symbol(result: types.ParserResult, state)
     local symbol: types.Symbol = state.symbol
-    local object = result.data[symbol.location]
+    local object = result.data[symbol.address]
     state.object = object
-    validator[`validate_{symbol.kind}`](result, state)
+    validator[`validate_kind_{symbol.kind}`](result, state)
 end
 
-function validator.validate_enum(result: types.ParserResult, state)
+function validator.validate_kind_enum(result: types.ParserResult, state)
     local enum: types.Enum = state.object
 end
 
-function validator.validate_struct(result: types.ParserResult, state)
+function validator.validate_kind_struct(result: types.ParserResult, state)
     local struct: types.Struct = state.object
     for _, field in struct.fields do
         state.field = field
         validator.validate_field(result, state)
     end
+end
+
+function validator.validate_kind_type(result: types.ParserResult, state)
+    local type: types.Type = state.object
+    state.type = type
+    validator.validate_type(result, state)
 end
 
 function validator.validate_field(result: types.ParserResult, state)
@@ -42,7 +48,7 @@ function validator.validate_type(result: types.ParserResult, state)
         return
     elseif not table.find(types.builtin_datatypes, typename) then
         if not result.symbols[typename] then
-            error(`No symbol '{typename}' is found`, 6)
+            error(`symbol '{typename}' is not defined!`, 6)
         end
     end
 end
