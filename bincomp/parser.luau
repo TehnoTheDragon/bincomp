@@ -65,7 +65,7 @@ function lexer.begin(self: types.Lexer, source: string): types.Lexer
 end
 
 function lexer.is_end(self: types.Lexer)
-    return self.current >= self.length
+    return self.current > self.length
 end
 
 function lexer.stream(self: types.Lexer): () -> types.Token
@@ -269,9 +269,10 @@ function parser.parse_type(self: types.Parser, result: types.ParserResult, state
     end
 
     local type = get_type()
-    state.item = type
-    type.meta = self:parse_meta(result, state)
-    type.tags = self:parse_tags(result, state)
+    local item = state.item or type
+    state.item = item
+    item.meta = self:parse_meta(result, state)
+    item.tags = self:parse_tags(result, state)
     return type
 end
 
@@ -353,10 +354,14 @@ end
 
 function parser.parse_type_enum(self: types.Parser, result: types.ParserResult, state)
     local identity: string = state.identity
+    if result.symbols[identity] then
+        error(`Redefined symbol '{identity}'`)
+    end
     
     local enum: types.Enum = { name = identity, items = {} }
-    table.insert(result.data, enum)
-    result.symbols[identity] = { symbol = identity, location = #result.data, kind = "enum" }
+    local address = tonumber(tostring(enum):sub(8), 16)
+    result.data[address] = enum
+    result.symbols[identity] = { symbol = identity, address = enum, kind = "enum" }
 
     self:eat("open_curly")
 
@@ -365,11 +370,16 @@ function parser.parse_type_enum(self: types.Parser, result: types.ParserResult, 
         if self:isa("close_curly") then break end
 
         local identity = self:eat("word").value
+        if enum.items[identity] then
+            error(`Redefined field name '{identity}'`, 2)
+        end
+
         local field: types.EnumField = { name = identity, index = enum_item_index, type = nil }
         enum_item_index += 1
 
         if self:isa("colon") then
             self:eat("colon")
+            state.item = field
             field.type = self:parse_type(result, state)
         end
 
@@ -384,10 +394,14 @@ end
 
 function parser.parse_type_struct(self: types.Parser, result: types.ParserResult, state)
     local identity: string = state.identity
+    if result.symbols[identity] then
+        error(`Redefined symbol '{identity}'`)
+    end
     
     local struct: types.Struct = { name = identity, fields = {} }
-    table.insert(result.data, struct)
-    result.symbols[identity] = { symbol = identity, location = #result.data, kind = "struct" }
+    local address = tonumber(tostring(struct):sub(8), 16)
+    result.data[address] = struct
+    result.symbols[identity] = { symbol = identity, address = address, kind = "struct" }
 
     self:eat("open_curly")
 
@@ -395,16 +409,35 @@ function parser.parse_type_struct(self: types.Parser, result: types.ParserResult
         if self:isa("close_curly") then break end
 
         local identity = self:eat("word").value
-        self:eat("colon")
-        local type = self:parse_type(result, state)
+        if struct.fields[identity] then
+            error(`Redefined field name '{identity}'`, 2)
+        end
+        local field: types.StructField = { name = identity, type = nil }
 
-        struct.fields[identity] = { name = identity, type = type }
+        self:eat("colon")
+        state.item = field
+        field.type = self:parse_type(result, state)
+
+        struct.fields[identity] = field
         
         if not self:isa("comma") then break end
         self:eat("comma")
     end
 
     self:eat("close_curly")
+end
+
+function parser.parse_type_type(self: types.Parser, result: types.ParserResult, state)
+    local identity: string = state.identity
+    if result.symbols[identity] then
+        error(`Redefined symbol '{identity}'`)
+    end
+    self:eat("equal")
+    
+    local type: types.Type = self:parse_type(result, state)
+    local address = tonumber(tostring(type):sub(8), 16)
+    result.data[address] = type
+    result.symbols[identity] = { symbol = identity, address = address, kind = "type" }
 end
 
 return parser
